@@ -356,7 +356,7 @@ class QueDataQuery extends GraphQLQuery<QueData$Query, QueDataArguments> {
           VariableDefinitionNode(
               variable: VariableNode(name: NameNode(value: 'stringNullable')),
               type: NamedTypeNode(
-                  name: NameNode(value: 'String'), isNonNull: false),
+                  name: NameNode(value: 'String'), ),
               defaultValue: DefaultValueNode(value: null),
               directives: [])
         ],
