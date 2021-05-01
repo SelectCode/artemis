@@ -180,19 +180,15 @@ Iterable<QueryDefinition> generateDefinitions(
                 .value ??
             suffix;
 
-    // if (rootTypeName == null) {
-    //   throw Exception(
-    //       '''No root type was found for ${operation.type} $operationName.''');
-    // }
-
     final TypeDefinitionNode parentType =
         objectVisitor.getByName(rootTypeName)!;
 
     final name = QueryName.fromPath(
-        path: createPathName([
-      ClassName(name: operationName),
-      ClassName(name: parentType.name.value)
-    ], schemaMap.namingScheme));
+      path: createPathName([
+        ClassName(name: operationName),
+        ClassName(name: parentType.name.value)
+      ], schemaMap.namingScheme),
+    );
 
     final context = Context(
       schema: schema,
@@ -302,8 +298,7 @@ ClassProperty createClassProperty({
 Make sure your query is correct and your schema is updated.''');
   }
 
-  final nextType =
-      gql.getTypeByName(context.schema, fieldType, context: 'field node');
+  final nextType = gql.getTypeByName(context.schema, fieldType);
 
   final aliasedContext = context.withAlias(
     nextFieldName: fieldName,
@@ -339,7 +334,7 @@ Make sure your query is correct and your schema is updated.''');
         nextFieldName: nextFieldName,
         nextClassName: ClassName(name: nextType.name.value),
         alias: fieldAlias,
-        // ofUnion: Nullable<TypeDefinitionNode?>(null),
+        ofUnion: Nullable<TypeDefinitionNode?>(null),
       ),
     );
   }
