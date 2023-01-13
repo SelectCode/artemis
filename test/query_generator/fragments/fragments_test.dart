@@ -1,5 +1,3 @@
-// @dart = 2.8
-
 import 'package:artemis/generator/data/data.dart';
 import 'package:test/test.dart';
 
@@ -42,26 +40,24 @@ final LibraryDefinition libraryDefinition =
       name: QueryName(name: r'SomeQuery$_SomeObject'),
       operationName: r'some_query',
       classes: [
-        FragmentClassDefinition(
-            name: FragmentName(name: r'MyFragmentMixin'),
-            properties: [
-              ClassProperty(
-                  type: TypeName(name: r'String'),
-                  name: ClassPropertyName(name: r's'),
-                  isNonNull: false,
-                  isResolveType: false),
-              ClassProperty(
-                  type: TypeName(name: r'int'),
-                  name: ClassPropertyName(name: r'i'),
-                  isNonNull: false,
-                  isResolveType: false)
-            ]),
         ClassDefinition(
             name: ClassName(name: r'SomeQuery$_SomeObject'),
             mixins: [FragmentName(name: r'MyFragmentMixin')],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
-            isInput: false)
+            typeNameField: ClassPropertyName(name: r'__typename'),
+            isInput: false),
+        FragmentClassDefinition(
+            name: FragmentName(name: r'MyFragmentMixin'),
+            properties: [
+              ClassProperty(
+                  type: DartTypeName(name: r'String'),
+                  name: ClassPropertyName(name: r's'),
+                  isResolveType: false),
+              ClassProperty(
+                  type: DartTypeName(name: r'int'),
+                  name: ClassPropertyName(name: r'i'),
+                  isResolveType: false)
+            ])
       ],
       generateHelpers: false,
       suffix: r'Query')
@@ -75,19 +71,21 @@ import 'package:gql/ast.dart';
 part 'query.graphql.g.dart';
 
 mixin MyFragmentMixin {
-  String s;
-  int i;
+  String? s;
+  int? i;
 }
 
 @JsonSerializable(explicitToJson: true)
-class SomeQuery$SomeObject with EquatableMixin, MyFragmentMixin {
+class SomeQuery$SomeObject extends JsonSerializable
+    with EquatableMixin, MyFragmentMixin {
   SomeQuery$SomeObject();
 
   factory SomeQuery$SomeObject.fromJson(Map<String, dynamic> json) =>
       _$SomeQuery$SomeObjectFromJson(json);
 
   @override
-  List<Object> get props => [s, i];
+  List<Object?> get props => [s, i];
+  @override
   Map<String, dynamic> toJson() => _$SomeQuery$SomeObjectToJson(this);
 }
 ''';

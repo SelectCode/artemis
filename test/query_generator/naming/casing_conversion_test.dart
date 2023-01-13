@@ -1,5 +1,3 @@
-// @dart = 2.8
-
 import 'package:artemis/generator/data/data.dart';
 import 'package:artemis/generator/data/enum_value_definition.dart';
 import 'package:test/test.dart';
@@ -111,19 +109,16 @@ final LibraryDefinition libraryDefinition =
               ClassProperty(
                   type: TypeName(name: r'CamelCaseType'),
                   name: ClassPropertyName(name: r'camelCaseField'),
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'PascalCaseType'),
                   name: ClassPropertyName(name: r'PascalCaseField'),
                   annotations: [r'''JsonKey(name: 'PascalCaseField')'''],
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'SnakeCaseType'),
                   name: ClassPropertyName(name: r'snake_case_field'),
                   annotations: [r'''JsonKey(name: 'snake_case_field')'''],
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'ScreamingSnakeCaseType'),
@@ -131,7 +126,6 @@ final LibraryDefinition libraryDefinition =
                   annotations: [
                     r'''JsonKey(name: 'SCREAMING_SNAKE_CASE_FIELD')'''
                   ],
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'MyEnum'),
@@ -139,11 +133,10 @@ final LibraryDefinition libraryDefinition =
                   annotations: [
                     r'JsonKey(unknownEnumValue: MyEnum.artemisUnknown)'
                   ],
-                  isNonNull: false,
                   isResolveType: false)
             ],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
+            typeNameField: ClassPropertyName(name: r'__typename'),
             isInput: false),
         ClassDefinition(
             name: ClassName(name: r'SomeQuery$_Query'),
@@ -151,11 +144,10 @@ final LibraryDefinition libraryDefinition =
               ClassProperty(
                   type: TypeName(name: r'SomeObject'),
                   name: ClassPropertyName(name: r'query'),
-                  isNonNull: false,
                   isResolveType: false)
             ],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
+            typeNameField: ClassPropertyName(name: r'__typename'),
             isInput: false),
         ClassDefinition(
             name: ClassName(name: r'Input'),
@@ -163,19 +155,16 @@ final LibraryDefinition libraryDefinition =
               ClassProperty(
                   type: TypeName(name: r'CamelCaseTypeInput'),
                   name: ClassPropertyName(name: r'camelCaseField'),
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'PascalCaseTypeInput'),
                   name: ClassPropertyName(name: r'PascalCaseField'),
                   annotations: [r'''JsonKey(name: 'PascalCaseField')'''],
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'SnakeCaseTypeInput'),
                   name: ClassPropertyName(name: r'snake_case_field'),
                   annotations: [r'''JsonKey(name: 'snake_case_field')'''],
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'ScreamingSnakeCaseTypeInput'),
@@ -183,7 +172,6 @@ final LibraryDefinition libraryDefinition =
                   annotations: [
                     r'''JsonKey(name: 'SCREAMING_SNAKE_CASE_FIELD')'''
                   ],
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'MyEnum'),
@@ -191,18 +179,16 @@ final LibraryDefinition libraryDefinition =
                   annotations: [
                     r'JsonKey(unknownEnumValue: MyEnum.artemisUnknown)'
                   ],
-                  isNonNull: false,
                   isResolveType: false)
             ],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
+            typeNameField: ClassPropertyName(name: r'__typename'),
             isInput: true)
       ],
       inputs: [
         QueryInput(
-            type: TypeName(name: r'Input'),
-            name: QueryInputName(name: r'filter'),
-            isNonNull: true)
+            type: TypeName(name: r'Input', isNonNull: true),
+            name: QueryInputName(name: r'filter'))
       ],
       generateHelpers: true,
       suffix: r'Query')
@@ -210,7 +196,6 @@ final LibraryDefinition libraryDefinition =
 
 const generatedFile = r'''// GENERATED CODE - DO NOT MODIFY BY HAND
 
-import 'package:meta/meta.dart';
 import 'package:artemis/artemis.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/equatable.dart';
@@ -218,84 +203,88 @@ import 'package:gql/ast.dart';
 part 'query.graphql.g.dart';
 
 @JsonSerializable(explicitToJson: true)
-class SomeObject with EquatableMixin {
+class SomeObject extends JsonSerializable with EquatableMixin {
   SomeObject();
 
   factory SomeObject.fromJson(Map<String, dynamic> json) =>
       _$SomeObjectFromJson(json);
 
-  CamelCaseType camelCaseField;
+  CamelCaseType? camelCaseField;
 
   @JsonKey(name: 'PascalCaseField')
-  PascalCaseType pascalCaseField;
+  PascalCaseType? pascalCaseField;
 
   @JsonKey(name: 'snake_case_field')
-  SnakeCaseType snakeCaseField;
+  SnakeCaseType? snakeCaseField;
 
   @JsonKey(name: 'SCREAMING_SNAKE_CASE_FIELD')
-  ScreamingSnakeCaseType screamingSnakeCaseField;
+  ScreamingSnakeCaseType? screamingSnakeCaseField;
 
   @JsonKey(unknownEnumValue: MyEnum.artemisUnknown)
-  MyEnum e;
+  MyEnum? e;
 
   @override
-  List<Object> get props => [
+  List<Object?> get props => [
         camelCaseField,
         pascalCaseField,
         snakeCaseField,
         screamingSnakeCaseField,
         e
       ];
+  @override
   Map<String, dynamic> toJson() => _$SomeObjectToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
-class SomeQuery$Query with EquatableMixin {
+class SomeQuery$Query extends JsonSerializable with EquatableMixin {
   SomeQuery$Query();
 
   factory SomeQuery$Query.fromJson(Map<String, dynamic> json) =>
       _$SomeQuery$QueryFromJson(json);
 
-  SomeObject query;
+  SomeObject? query;
 
   @override
-  List<Object> get props => [query];
+  List<Object?> get props => [query];
+  @override
   Map<String, dynamic> toJson() => _$SomeQuery$QueryToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
-class Input with EquatableMixin {
-  Input(
-      {this.camelCaseField,
-      this.pascalCaseField,
-      this.snakeCaseField,
-      this.screamingSnakeCaseField,
-      this.e});
+class Input extends JsonSerializable with EquatableMixin {
+  Input({
+    this.camelCaseField,
+    this.pascalCaseField,
+    this.snakeCaseField,
+    this.screamingSnakeCaseField,
+    this.e,
+  });
 
   factory Input.fromJson(Map<String, dynamic> json) => _$InputFromJson(json);
 
-  CamelCaseTypeInput camelCaseField;
+  CamelCaseTypeInput? camelCaseField;
 
   @JsonKey(name: 'PascalCaseField')
-  PascalCaseTypeInput pascalCaseField;
+  PascalCaseTypeInput? pascalCaseField;
 
   @JsonKey(name: 'snake_case_field')
-  SnakeCaseTypeInput snakeCaseField;
+  SnakeCaseTypeInput? snakeCaseField;
 
   @JsonKey(name: 'SCREAMING_SNAKE_CASE_FIELD')
-  ScreamingSnakeCaseTypeInput screamingSnakeCaseField;
+  ScreamingSnakeCaseTypeInput? screamingSnakeCaseField;
 
   @JsonKey(unknownEnumValue: MyEnum.artemisUnknown)
-  MyEnum e;
+  MyEnum? e;
 
   @override
-  List<Object> get props => [
+  List<Object?> get props => [
         camelCaseField,
         pascalCaseField,
         snakeCaseField,
         screamingSnakeCaseField,
         e
       ];
+  @override
   Map<String, dynamic> toJson() => _$InputToJson(this);
 }
 
@@ -314,90 +303,104 @@ enum MyEnum {
 
 @JsonSerializable(explicitToJson: true)
 class SomeQueryArguments extends JsonSerializable with EquatableMixin {
-  SomeQueryArguments({@required this.filter});
+  SomeQueryArguments({required this.filter});
 
   @override
   factory SomeQueryArguments.fromJson(Map<String, dynamic> json) =>
       _$SomeQueryArgumentsFromJson(json);
 
-  final Input filter;
+  late Input filter;
 
   @override
-  List<Object> get props => [filter];
+  List<Object?> get props => [filter];
   @override
   Map<String, dynamic> toJson() => _$SomeQueryArgumentsToJson(this);
 }
 
-class SomeQueryQuery extends GraphQLQuery<SomeQuery$Query, SomeQueryArguments> {
-  SomeQueryQuery({this.variables});
-
-  @override
-  final DocumentNode document = DocumentNode(definitions: [
-    OperationDefinitionNode(
-        type: OperationType.query,
-        name: NameNode(value: 'some_query'),
-        variableDefinitions: [
-          VariableDefinitionNode(
-              variable: VariableNode(name: NameNode(value: 'filter')),
-              type: NamedTypeNode(
-                  name: NameNode(value: 'Input'), isNonNull: true),
-              defaultValue: DefaultValueNode(value: null),
-              directives: [])
+final SOME_QUERY_QUERY_DOCUMENT_OPERATION_NAME = 'some_query';
+final SOME_QUERY_QUERY_DOCUMENT = DocumentNode(definitions: [
+  OperationDefinitionNode(
+    type: OperationType.query,
+    name: NameNode(value: 'some_query'),
+    variableDefinitions: [
+      VariableDefinitionNode(
+        variable: VariableNode(name: NameNode(value: 'filter')),
+        type: NamedTypeNode(
+          name: NameNode(value: 'Input'),
+          isNonNull: true,
+        ),
+        defaultValue: DefaultValueNode(value: null),
+        directives: [],
+      )
+    ],
+    directives: [],
+    selectionSet: SelectionSetNode(selections: [
+      FieldNode(
+        name: NameNode(value: 'query'),
+        alias: null,
+        arguments: [
+          ArgumentNode(
+            name: NameNode(value: 'filter'),
+            value: VariableNode(name: NameNode(value: 'filter')),
+          )
         ],
         directives: [],
         selectionSet: SelectionSetNode(selections: [
           FieldNode(
-              name: NameNode(value: 'query'),
-              alias: null,
-              arguments: [
-                ArgumentNode(
-                    name: NameNode(value: 'filter'),
-                    value: VariableNode(name: NameNode(value: 'filter')))
-              ],
-              directives: [],
-              selectionSet: SelectionSetNode(selections: [
-                FieldNode(
-                    name: NameNode(value: 'camelCaseField'),
-                    alias: null,
-                    arguments: [],
-                    directives: [],
-                    selectionSet: null),
-                FieldNode(
-                    name: NameNode(value: 'PascalCaseField'),
-                    alias: null,
-                    arguments: [],
-                    directives: [],
-                    selectionSet: null),
-                FieldNode(
-                    name: NameNode(value: 'snake_case_field'),
-                    alias: null,
-                    arguments: [],
-                    directives: [],
-                    selectionSet: null),
-                FieldNode(
-                    name: NameNode(value: 'SCREAMING_SNAKE_CASE_FIELD'),
-                    alias: null,
-                    arguments: [],
-                    directives: [],
-                    selectionSet: null),
-                FieldNode(
-                    name: NameNode(value: 'e'),
-                    alias: null,
-                    arguments: [],
-                    directives: [],
-                    selectionSet: null)
-              ]))
-        ]))
-  ]);
+            name: NameNode(value: 'camelCaseField'),
+            alias: null,
+            arguments: [],
+            directives: [],
+            selectionSet: null,
+          ),
+          FieldNode(
+            name: NameNode(value: 'PascalCaseField'),
+            alias: null,
+            arguments: [],
+            directives: [],
+            selectionSet: null,
+          ),
+          FieldNode(
+            name: NameNode(value: 'snake_case_field'),
+            alias: null,
+            arguments: [],
+            directives: [],
+            selectionSet: null,
+          ),
+          FieldNode(
+            name: NameNode(value: 'SCREAMING_SNAKE_CASE_FIELD'),
+            alias: null,
+            arguments: [],
+            directives: [],
+            selectionSet: null,
+          ),
+          FieldNode(
+            name: NameNode(value: 'e'),
+            alias: null,
+            arguments: [],
+            directives: [],
+            selectionSet: null,
+          ),
+        ]),
+      )
+    ]),
+  )
+]);
+
+class SomeQueryQuery extends GraphQLQuery<SomeQuery$Query, SomeQueryArguments> {
+  SomeQueryQuery({required this.variables});
 
   @override
-  final String operationName = 'some_query';
+  final DocumentNode document = SOME_QUERY_QUERY_DOCUMENT;
+
+  @override
+  final String operationName = SOME_QUERY_QUERY_DOCUMENT_OPERATION_NAME;
 
   @override
   final SomeQueryArguments variables;
 
   @override
-  List<Object> get props => [document, operationName, variables];
+  List<Object?> get props => [document, operationName, variables];
   @override
   SomeQuery$Query parse(Map<String, dynamic> json) =>
       SomeQuery$Query.fromJson(json);

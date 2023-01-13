@@ -1,5 +1,3 @@
-// @dart = 2.8
-
 import 'package:artemis/generator/data/data.dart';
 import 'package:test/test.dart';
 
@@ -64,31 +62,17 @@ final LibraryDefinition libraryDefinition =
       name: QueryName(name: r'SomeQuery$_QueryResponse'),
       operationName: r'some_query',
       classes: [
-        FragmentClassDefinition(
-            name: FragmentName(name: r'MyFragmentMixin'),
-            properties: [
-              ClassProperty(
-                  type: TypeName(name: r'String'),
-                  name: ClassPropertyName(name: r's'),
-                  isNonNull: false,
-                  isResolveType: false),
-              ClassProperty(
-                  type: TypeName(name: r'int'),
-                  name: ClassPropertyName(name: r'i'),
-                  isNonNull: false,
-                  isResolveType: false)
-            ]),
         ClassDefinition(
             name: ClassName(name: r'SomeObject'),
             mixins: [FragmentName(name: r'MyFragmentMixin')],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
+            typeNameField: ClassPropertyName(name: r'__typename'),
             isInput: false),
         ClassDefinition(
             name: ClassName(name: r'SomeObject'),
             mixins: [FragmentName(name: r'MyFragmentMixin')],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
+            typeNameField: ClassPropertyName(name: r'__typename'),
             isInput: false),
         ClassDefinition(
             name: ClassName(name: r'MoreData'),
@@ -96,11 +80,10 @@ final LibraryDefinition libraryDefinition =
               ClassProperty(
                   type: TypeName(name: r'SomeObject'),
                   name: ClassPropertyName(name: r'someObject'),
-                  isNonNull: false,
                   isResolveType: false)
             ],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
+            typeNameField: ClassPropertyName(name: r'__typename'),
             isInput: false),
         ClassDefinition(
             name: ClassName(name: r'SomeQuery$_QueryResponse'),
@@ -108,17 +91,27 @@ final LibraryDefinition libraryDefinition =
               ClassProperty(
                   type: TypeName(name: r'SomeObject'),
                   name: ClassPropertyName(name: r'someObject'),
-                  isNonNull: false,
                   isResolveType: false),
               ClassProperty(
                   type: TypeName(name: r'MoreData'),
                   name: ClassPropertyName(name: r'moreData'),
-                  isNonNull: false,
                   isResolveType: false)
             ],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
-            isInput: false)
+            typeNameField: ClassPropertyName(name: r'__typename'),
+            isInput: false),
+        FragmentClassDefinition(
+            name: FragmentName(name: r'MyFragmentMixin'),
+            properties: [
+              ClassProperty(
+                  type: DartTypeName(name: r'String'),
+                  name: ClassPropertyName(name: r's'),
+                  isResolveType: false),
+              ClassProperty(
+                  type: DartTypeName(name: r'int'),
+                  name: ClassPropertyName(name: r'i'),
+                  isResolveType: false)
+            ])
       ],
       generateHelpers: false,
       suffix: r'Query')
@@ -132,49 +125,52 @@ import 'package:gql/ast.dart';
 part 'query.graphql.g.dart';
 
 mixin MyFragmentMixin {
-  String s;
-  int i;
+  String? s;
+  int? i;
 }
 
 @JsonSerializable(explicitToJson: true)
-class SomeObject with EquatableMixin, MyFragmentMixin {
+class SomeObject extends JsonSerializable with EquatableMixin, MyFragmentMixin {
   SomeObject();
 
   factory SomeObject.fromJson(Map<String, dynamic> json) =>
       _$SomeObjectFromJson(json);
 
   @override
-  List<Object> get props => [s, i];
+  List<Object?> get props => [s, i];
+  @override
   Map<String, dynamic> toJson() => _$SomeObjectToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
-class MoreData with EquatableMixin {
+class MoreData extends JsonSerializable with EquatableMixin {
   MoreData();
 
   factory MoreData.fromJson(Map<String, dynamic> json) =>
       _$MoreDataFromJson(json);
 
-  SomeObject someObject;
+  SomeObject? someObject;
 
   @override
-  List<Object> get props => [someObject];
+  List<Object?> get props => [someObject];
+  @override
   Map<String, dynamic> toJson() => _$MoreDataToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
-class SomeQuery$QueryResponse with EquatableMixin {
+class SomeQuery$QueryResponse extends JsonSerializable with EquatableMixin {
   SomeQuery$QueryResponse();
 
   factory SomeQuery$QueryResponse.fromJson(Map<String, dynamic> json) =>
       _$SomeQuery$QueryResponseFromJson(json);
 
-  SomeObject someObject;
+  SomeObject? someObject;
 
-  MoreData moreData;
+  MoreData? moreData;
 
   @override
-  List<Object> get props => [someObject, moreData];
+  List<Object?> get props => [someObject, moreData];
+  @override
   Map<String, dynamic> toJson() => _$SomeQuery$QueryResponseToJson(this);
 }
 ''';

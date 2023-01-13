@@ -1,12 +1,9 @@
-// @dart = 2.8
-
 import 'package:artemis/generator/data/class_definition.dart';
 import 'package:artemis/generator/data/definition.dart';
 import 'package:artemis/generator/data/query_input.dart';
 import 'package:artemis/generator/data_printer.dart';
 import 'package:artemis/generator/helpers.dart';
 import 'package:gql/ast.dart';
-import 'package:meta/meta.dart';
 import 'package:recase/recase.dart';
 
 /// Define a GraphQL query and its dependencies.
@@ -26,26 +23,37 @@ class QueryDefinition extends Definition with DataPrinter {
   /// If instances of [GraphQLQuery] should be generated.
   final bool generateHelpers;
 
+  /// If query documents and operation names should be generated
+  final bool generateQueries;
+
   /// The suffix of generated [GraphQLQuery] classes.
   final String suffix;
 
   /// Instantiate a query definition.
   QueryDefinition({
-    @required Name name,
-    @required this.operationName,
+    required Name name,
+    required this.operationName,
     this.document = const DocumentNode(),
     this.classes = const [],
     this.inputs = const [],
     this.generateHelpers = false,
+    this.generateQueries = false,
     this.suffix = 'Query',
-  })  : assert(hasValue(name) && hasValue(operationName)),
+  })  : assert(hasValue(operationName)),
         super(name: name);
 
   /// class name for helper classes
-  String get className => ClassName(name: operationName).namePrintable;
+  String? get className => ClassName(name: operationName).namePrintable;
+
+  /// name for document constant
+  String get documentName => '$className${suffix}Document';
+
+  /// name for document operation name constant
+  String get documentOperationName =>
+      '$className${suffix}DocumentOperationName';
 
   @override
-  Map<String, Object> get namedProps => {
+  Map<String, Object?> get namedProps => {
         'name': name,
         'operationName': operationName,
         'classes': classes,
@@ -58,15 +66,17 @@ class QueryDefinition extends Definition with DataPrinter {
 /// Query name
 class QueryName extends Name with DataPrinter {
   /// Instantiate a query name definition.
-  QueryName({String name}) : super(name: name);
+  QueryName({required String name})
+      : assert(hasValue(name)),
+        super(name: name);
 
   /// Generate class name from hierarchical path
-  factory QueryName.fromPath({List<Name> path}) {
-    return QueryName(name: path.map((e) => e.namePrintable).join(r'$_'));
+  factory QueryName.fromPath({required List<Name?> path}) {
+    return QueryName(name: path.map((e) => e!.dartTypeSafe).join(r'$_'));
   }
 
   @override
-  Map<String, Object> get namedProps => {
+  Map<String, Object?> get namedProps => {
         'name': name,
       };
 

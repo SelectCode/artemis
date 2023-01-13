@@ -1,14 +1,13 @@
-// @dart = 2.8
-
 import 'package:artemis/generator/data/data.dart';
 import 'package:artemis/generator/data/enum_value_definition.dart';
+import 'package:artemis/generator/data/nullable.dart';
 import 'package:artemis/visitor/canonical_visitor.dart';
 import 'package:artemis/visitor/generator_visitor.dart';
 import 'package:artemis/visitor/object_type_definition_visitor.dart';
 import 'package:artemis/visitor/schema_definition_visitor.dart';
 import 'package:artemis/visitor/type_definition_node_visitor.dart';
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:gql/ast.dart';
-import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
 
 import './generator/ephemeral_data.dart';
@@ -17,10 +16,10 @@ import './generator/graphql_helpers.dart' as gql;
 import './generator/helpers.dart';
 import './schema/options.dart';
 
-typedef _OnNewClassFoundCallback = void Function(Context context);
+typedef OnNewClassFoundCallback = void Function(Context context);
 
 /// Enum value for values not mapped in the GraphQL enum
-final EnumValueDefinition ARTEMIS_UNKNOWN = EnumValueDefinition(
+final EnumValueDefinition artemisUnknown = EnumValueDefinition(
   name: EnumValueName(name: 'ARTEMIS_UNKNOWN'),
 );
 
@@ -34,9 +33,13 @@ LibraryDefinition generateLibrary(
   List<FragmentDefinitionNode> fragmentsCommon,
   DocumentNode schema,
 ) {
+  final typeDefinitionNodeVisitor = TypeDefinitionNodeVisitor();
+  schema.accept(typeDefinitionNodeVisitor);
+
   final canonicalVisitor = CanonicalVisitor(
     context: Context(
       schema: schema,
+      typeDefinitionNodeVisitor: typeDefinitionNodeVisitor,
       options: options,
       schemaMap: schemaMap,
       path: [],
@@ -53,15 +56,32 @@ LibraryDefinition generateLibrary(
 
   schema.accept(canonicalVisitor);
 
-  final queryDefinitions = gqlDocs
+  final documentFragments = gqlDocs
+      .map((doc) => doc.definitions.whereType<FragmentDefinitionNode>())
+      .expand((e) => e)
+      .toList();
+
+  final documentsWithoutFragments = gqlDocs.map((doc) {
+    return DocumentNode(
+      definitions:
+          doc.definitions.where((e) => e is! FragmentDefinitionNode).toList(),
+      span: doc.span,
+    );
+  }).toList();
+
+  final queryDefinitions = documentsWithoutFragments
       .map((doc) => generateDefinitions(
-            schema,
-            path,
-            doc,
-            options,
-            schemaMap,
-            fragmentsCommon,
-            canonicalVisitor,
+            schema: schema,
+            typeDefinitionNodeVisitor: typeDefinitionNodeVisitor,
+            path: path,
+            document: doc,
+            options: options,
+            schemaMap: schemaMap,
+            fragmentsCommon: [
+              ...documentFragments,
+              ...fragmentsCommon,
+            ],
+            canonicalVisitor: canonicalVisitor,
           ))
       .expand((e) => e)
       .toList();
@@ -89,7 +109,7 @@ LibraryDefinition generateLibrary(
   );
 }
 
-Set<FragmentDefinitionNode> _extractFragments(SelectionSetNode selectionSet,
+Set<FragmentDefinitionNode> _extractFragments(SelectionSetNode? selectionSet,
     List<FragmentDefinitionNode> fragmentsCommon) {
   final result = <FragmentDefinitionNode>{};
   if (selectionSet != null) {
@@ -106,12 +126,13 @@ Set<FragmentDefinitionNode> _extractFragments(SelectionSetNode selectionSet,
     selectionSet.selections
         .whereType<FragmentSpreadNode>()
         .forEach((selection) {
-      final fragmentDefinitions = fragmentsCommon.firstWhere(
-          (fragmentDefinition) =>
-              fragmentDefinition.name.value == selection.name.value);
-      result.add(fragmentDefinitions);
-      result.addAll(
-          _extractFragments(fragmentDefinitions.selectionSet, fragmentsCommon));
+      final fragmentDefinitions = fragmentsCommon.where((fragmentDefinition) =>
+          fragmentDefinition.name.value == selection.name.value);
+      result.addAll(fragmentDefinitions);
+      for (var fragmentDefinition in fragmentDefinitions) {
+        result.addAll(_extractFragments(
+            fragmentDefinition.selectionSet, fragmentsCommon));
+      }
     });
   }
   return result;
@@ -119,35 +140,41 @@ Set<FragmentDefinitionNode> _extractFragments(SelectionSetNode selectionSet,
 
 /// Generate a query definition from a GraphQL schema and a query, given
 /// Artemis options and schema mappings.
-Iterable<QueryDefinition> generateDefinitions(
-  DocumentNode schema,
-  String path,
-  DocumentNode document,
-  GeneratorOptions options,
-  SchemaMap schemaMap,
-  List<FragmentDefinitionNode> fragmentsCommon,
-  CanonicalVisitor canonicalVisitor,
-) {
-  final fragments = <FragmentDefinitionNode>[];
+Iterable<QueryDefinition> generateDefinitions({
+  required DocumentNode schema,
+  required TypeDefinitionNodeVisitor typeDefinitionNodeVisitor,
+  required String path,
+  required DocumentNode document,
+  required GeneratorOptions options,
+  required SchemaMap schemaMap,
+  required List<FragmentDefinitionNode> fragmentsCommon,
+  required CanonicalVisitor canonicalVisitor,
+}) {
+  // final documentFragments =
+  //     document.definitions.whereType<FragmentDefinitionNode>();
 
-  final documentFragments =
-      document.definitions.whereType<FragmentDefinitionNode>();
-
-  if (documentFragments.isNotEmpty && fragmentsCommon.isNotEmpty) {
-    throw FragmentIgnoreException();
-  }
+  // if (documentFragments.isNotEmpty && fragmentsCommon.isNotEmpty) {
+  //   throw FragmentIgnoreException();
+  // }
 
   final operations =
       document.definitions.whereType<OperationDefinitionNode>().toList();
 
   return operations.map((operation) {
-    if (fragmentsCommon.isEmpty) {
-      fragments.addAll(documentFragments);
-    } else {
+    // final fragments = <FragmentDefinitionNode>[
+    //   ...documentFragments,
+    // ];
+    final definitions = document.definitions
+        // filtering unused operations
+        .where((e) {
+      return e is! OperationDefinitionNode || e == operation;
+    }).toList();
+
+    if (fragmentsCommon.isNotEmpty) {
       final fragmentsOperation =
           _extractFragments(operation.selectionSet, fragmentsCommon);
-      document.definitions.addAll(fragmentsOperation);
-      fragments.addAll(fragmentsOperation);
+      definitions.addAll(fragmentsOperation);
+      // fragments.addAll(fragmentsOperation);
     }
 
     final basename = p.basenameWithoutExtension(path).split('.').first;
@@ -175,28 +202,28 @@ Iterable<QueryDefinition> generateDefinitions(
 
     final rootTypeName =
         (schemaVisitor.schemaDefinitionNode?.operationTypes ?? [])
-                .firstWhere((e) => e.operation == operation.type,
-                    orElse: () => null)
+                .firstWhereOrNull((e) => e.operation == operation.type)
                 ?.type
-                ?.name
-                ?.value ??
+                .name
+                .value ??
             suffix;
 
-    if (rootTypeName == null) {
-      throw Exception(
-          '''No root type was found for ${operation.type} $operationName.''');
+    final parentType = objectVisitor.getByName(rootTypeName);
+
+    if (parentType == null) {
+      throw MissingRootTypeException(rootTypeName);
     }
 
-    final TypeDefinitionNode parentType = objectVisitor.getByName(rootTypeName);
-
     final name = QueryName.fromPath(
-        path: createPathName([
-      ClassName(name: operationName),
-      ClassName(name: parentType.name.value)
-    ], schemaMap.namingScheme));
+      path: createPathName([
+        ClassName(name: operationName),
+        ClassName(name: parentType.name.value)
+      ], schemaMap.namingScheme),
+    );
 
     final context = Context(
       schema: schema,
+      typeDefinitionNodeVisitor: typeDefinitionNodeVisitor,
       options: options,
       schemaMap: schemaMap,
       path: [
@@ -208,38 +235,31 @@ Iterable<QueryDefinition> generateDefinitions(
       currentClassName: null,
       generatedClasses: [],
       inputsClasses: [],
-      fragments: fragments,
+      fragments: fragmentsCommon,
       usedEnums: {},
       usedInputObjects: {},
     );
 
-    final visitor = GeneratorVisitor(
-      context: context,
-    );
-
-    final filteredDefinition = DocumentNode(
-      definitions: document.definitions
-          // filtering unused operations
-          .where((e) {
-        return e is! OperationDefinitionNode || e == operation;
-      }).toList(),
-    );
-
-    filteredDefinition.accept(visitor);
+    final visitor = GeneratorVisitor(context: context);
+    final documentDefinitions = DocumentNode(definitions: definitions);
+    documentDefinitions.accept(visitor);
 
     return QueryDefinition(
       name: name,
       operationName: operationName,
-      document: filteredDefinition,
+      document: documentDefinitions,
       classes: [
-        ...canonicalVisitor.enums
-            .where((e) => context.usedEnums.contains(e.name)),
+        ...context.usedEnums
+            .map((e) => canonicalVisitor.enums[e.name]?.call())
+            .whereType<Definition>(),
         ...visitor.context.generatedClasses,
-        ...canonicalVisitor.inputObjects
-            .where((i) => context.usedInputObjects.contains(i.name)),
+        ...context.usedInputObjects
+            .map((e) => canonicalVisitor.inputObjects[e.name]?.call())
+            .whereType<Definition>(),
       ],
       inputs: visitor.context.inputsClasses,
       generateHelpers: options.generateHelpers,
+      generateQueries: options.generateQueries,
       suffix: suffix,
     );
   });
@@ -253,7 +273,7 @@ List<String> _extractCustomImports(
 
   schema.accept(typeVisitor);
 
-  return typeVisitor.types
+  return typeVisitor.types.values
       .whereType<ScalarTypeDefinitionNode>()
       .map((type) => gql.importsOfScalar(options, type.name.value))
       .expand((i) => i)
@@ -263,10 +283,10 @@ List<String> _extractCustomImports(
 
 /// Creates class property object
 ClassProperty createClassProperty({
-  @required ClassPropertyName fieldName,
-  ClassPropertyName fieldAlias,
-  @required Context context,
-  _OnNewClassFoundCallback onNewClassFound,
+  required ClassPropertyName fieldName,
+  ClassPropertyName? fieldAlias,
+  required Context context,
+  OnNewClassFoundCallback? onNewClassFound,
   bool markAsUsed = true,
 }) {
   if (fieldName.name == context.schemaMap.typeNameField) {
@@ -290,21 +310,21 @@ ClassProperty createClassProperty({
 
   final regularField = finalFields
       .whereType<FieldDefinitionNode>()
-      .firstWhere((f) => f.name.value == fieldName.name, orElse: () => null);
+      .firstWhereOrNull((f) => f.name.value == fieldName.name);
   final regularInputField = finalFields
       .whereType<InputValueDefinitionNode>()
-      .firstWhere((f) => f.name.value == fieldName.name, orElse: () => null);
+      .firstWhereOrNull((f) => f.name.value == fieldName.name);
 
   final fieldType = regularField?.type ?? regularInputField?.type;
 
   if (fieldType == null) {
     throw Exception(
-        '''Field $fieldName was not found in GraphQL type ${context.currentType?.name?.value}.
+        '''Field $fieldName was not found in GraphQL type ${context.currentType?.name.value}.
 Make sure your query is correct and your schema is updated.''');
   }
 
   final nextType =
-      gql.getTypeByName(context.schema, fieldType, context: 'field node');
+      gql.getTypeByName(context.typeDefinitionNodeVisitor, fieldType);
 
   final aliasedContext = context.withAlias(
     nextFieldName: fieldName,
@@ -314,25 +334,36 @@ Make sure your query is correct and your schema is updated.''');
 
   final nextClassName = aliasedContext.fullPathName();
 
-  final dartTypeName = gql.buildTypeName(fieldType, context.options,
-      dartType: true,
-      replaceLeafWith: ClassName.fromPath(path: nextClassName),
-      schema: context.schema);
+  final dartTypeName = gql.buildTypeName(
+    fieldType,
+    context.options,
+    dartType: true,
+    replaceLeafWith: ClassName.fromPath(path: nextClassName),
+    typeDefinitionNodeVisitor: context.typeDefinitionNodeVisitor,
+  );
 
   logFn(context, aliasedContext.align + 1,
-      '${aliasedContext.path}[${aliasedContext.currentType.name.value}][${aliasedContext.currentClassName} ${aliasedContext.currentFieldName}] ${fieldAlias == null ? '' : '(${fieldAlias}) '}-> ${dartTypeName.namePrintable}');
+      '${aliasedContext.path}[${aliasedContext.currentType!.name.value}][${aliasedContext.currentClassName} ${aliasedContext.currentFieldName}] ${fieldAlias == null ? '' : '($fieldAlias) '}-> ${dartTypeName.namePrintable}');
 
   if ((nextType is ObjectTypeDefinitionNode ||
           nextType is UnionTypeDefinitionNode ||
           nextType is InterfaceTypeDefinitionNode) &&
       onNewClassFound != null) {
+    ClassPropertyName? nextFieldName;
+
+    if (regularField != null) {
+      nextFieldName = ClassPropertyName(name: regularField.name.value);
+    } else if (regularInputField != null) {
+      nextFieldName = ClassPropertyName(name: regularInputField.name.value);
+    }
+
     onNewClassFound(
       aliasedContext.next(
         nextType: nextType,
-        nextFieldName: ClassPropertyName(
-            name: regularField?.name?.value ?? regularInputField?.name?.value),
+        nextFieldName: nextFieldName,
         nextClassName: ClassName(name: nextType.name.value),
         alias: fieldAlias,
+        ofUnion: Nullable<TypeDefinitionNode?>(null),
       ),
     );
   }
@@ -348,18 +379,19 @@ Make sure your query is correct and your schema is updated.''');
   if (nextType is ScalarTypeDefinitionNode) {
     final scalar = gql.getSingleScalarMap(context.options, nextType.name.value);
 
-    if (scalar.customParserImport != null &&
-        nextType.name.value == scalar.graphQLType) {
-      final graphqlTypeSafeStr = TypeName(
-          name: gql
-              .buildTypeName(fieldType, context.options,
-                  dartType: false, schema: context.schema)
-              .dartTypeSafe);
-      final dartTypeSafeStr = TypeName(name: dartTypeName.dartTypeSafe);
+    if (scalar?.customParserImport != null &&
+        nextType.name.value == scalar?.graphQLType) {
+      final graphqlTypeName = gql.buildTypeName(
+        fieldType,
+        context.options,
+        dartType: false,
+        typeDefinitionNodeVisitor: context.typeDefinitionNodeVisitor,
+      );
+
       jsonKeyAnnotation['fromJson'] =
-          'fromGraphQL${graphqlTypeSafeStr.namePrintable}ToDart${dartTypeSafeStr.namePrintable}';
+          'fromGraphQL${graphqlTypeName.parserSafe}ToDart${dartTypeName.parserSafe}';
       jsonKeyAnnotation['toJson'] =
-          'fromDart${dartTypeSafeStr.namePrintable}ToGraphQL${graphqlTypeSafeStr.namePrintable}';
+          'fromDart${dartTypeName.parserSafe}ToGraphQL${graphqlTypeName.parserSafe}';
     }
   } // On enums
   else if (nextType is EnumTypeDefinitionNode) {
@@ -369,15 +401,17 @@ Make sure your query is correct and your schema is updated.''');
 
     if (fieldType is ListTypeNode) {
       final innerDartTypeName = gql.buildTypeName(
-          fieldType.type, context.options,
-          dartType: true,
-          replaceLeafWith: ClassName.fromPath(path: nextClassName),
-          schema: context.schema);
+        fieldType.type,
+        context.options,
+        dartType: true,
+        replaceLeafWith: ClassName.fromPath(path: nextClassName),
+        typeDefinitionNodeVisitor: context.typeDefinitionNodeVisitor,
+      );
       jsonKeyAnnotation['unknownEnumValue'] =
-          '${innerDartTypeName.namePrintable}.${ARTEMIS_UNKNOWN.name.namePrintable}';
+          '${innerDartTypeName.dartTypeSafe}.${artemisUnknown.name.namePrintable}';
     } else {
       jsonKeyAnnotation['unknownEnumValue'] =
-          '${dartTypeName.namePrintable}.${ARTEMIS_UNKNOWN.name.namePrintable}';
+          '${dartTypeName.dartTypeSafe}.${artemisUnknown.name.namePrintable}';
     }
   }
 
@@ -390,7 +424,7 @@ Make sure your query is correct and your schema is updated.''');
     final jsonKey = jsonKeyAnnotation.entries
         .map<String>((e) => '${e.key}: ${e.value}')
         .join(', ');
-    annotations.add('JsonKey(${jsonKey})');
+    annotations.add('JsonKey($jsonKey)');
   }
   annotations.addAll(proceedDeprecated(fieldDirectives));
 
@@ -398,6 +432,5 @@ Make sure your query is correct and your schema is updated.''');
     type: dartTypeName,
     name: name,
     annotations: annotations,
-    isNonNull: fieldType.isNonNull,
   );
 }

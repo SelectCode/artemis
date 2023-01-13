@@ -1,10 +1,12 @@
-// @dart = 2.8
-
 import 'package:artemis/generator/data/data.dart';
 import 'package:artemis/generator/data/enum_value_definition.dart';
+import 'package:artemis/generator/errors.dart';
 import 'package:code_builder/code_builder.dart';
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:dart_style/dart_style.dart';
-import 'package:gql_code_gen/gql_code_gen.dart' as dart;
+// ignore: implementation_imports
+import 'package:gql_code_builder/src/ast.dart' as dart;
+import 'package:recase/recase.dart';
 
 import '../generator/helpers.dart';
 
@@ -54,14 +56,15 @@ String _toJsonBody(ClassDefinition definition) {
   return buffer.toString();
 }
 
-Method _propsMethod(String body) {
+Method _propsMethod(Iterable<String> body) {
   return Method((m) => m
     ..type = MethodType.getter
-    ..returns = refer('List<Object>')
+    ..returns = refer('List<Object?>')
     ..annotations.add(CodeExpression(Code('override')))
     ..name = 'props'
     ..lambda = true
-    ..body = Code(body));
+    ..body =
+        Code('[${body.mergeDuplicatesBy((i) => i, (a, b) => a).join(', ')}]'));
 }
 
 /// Generates a [Spec] of a single class definition.
@@ -98,6 +101,7 @@ Spec classDefinitionToSpec(
       ? Method(
           (m) => m
             ..name = 'toJson'
+            ..annotations.add(CodeExpression(Code('override')))
             ..returns = refer('Map<String, dynamic>')
             ..body = Code(_toJsonBody(definition)),
         )
@@ -105,6 +109,7 @@ Spec classDefinitionToSpec(
           (m) => m
             ..name = 'toJson'
             ..lambda = true
+            ..annotations.add(CodeExpression(Code('override')))
             ..returns = refer('Map<String, dynamic>')
             ..body = Code('_\$${definition.name.namePrintable}ToJson(this)'),
         );
@@ -114,6 +119,9 @@ Spec classDefinitionToSpec(
         return fragments
             .firstWhere((f) {
               return f.name == i;
+            }, orElse: () {
+              throw MissingFragmentException(
+                  i.namePrintable, definition.name.namePrintable);
             })
             .properties
             .map((p) => p.name.namePrintable);
@@ -121,8 +129,8 @@ Spec classDefinitionToSpec(
       .expand((i) => i)
       .followedBy(definition.properties.map((p) => p.name.namePrintable));
 
-  final extendedClass = classes
-      .firstWhere((e) => e.name == definition.extension, orElse: () => null);
+  final extendedClass =
+      classes.firstWhereOrNull((e) => e.name == definition.extension);
 
   return Class(
     (b) => b
@@ -131,31 +139,27 @@ Spec classDefinitionToSpec(
       ..name = definition.name.namePrintable
       ..mixins.add(refer('EquatableMixin'))
       ..mixins.addAll(definition.mixins.map((i) => refer(i.namePrintable)))
-      ..methods.add(_propsMethod('[${props.join(',')}]'))
+      ..methods.add(_propsMethod(props))
       ..extend = definition.extension != null
-          ? refer(definition.extension.namePrintable)
-          : null
+          ? refer(definition.extension!.namePrintable)
+          : refer('JsonSerializable')
       ..implements.addAll(definition.implementations.map((i) => refer(i)))
       ..constructors.add(Constructor((b) {
         if (definition.isInput) {
-          b
-            ..optionalParameters.addAll(definition.properties
-                .where((property) =>
-                    !property.isOverride && !property.isResolveType)
-                .map(
-                  (property) => Parameter(
-                    (p) {
-                      p
-                        ..name = property.name.namePrintable
-                        ..named = true
-                        ..toThis = true;
-
-                      if (property.isNonNull) {
-                        p.annotations.add(refer('required'));
-                      }
-                    },
-                  ),
-                ));
+          b.optionalParameters.addAll(definition.properties
+              .where(
+                  (property) => !property.isOverride && !property.isResolveType)
+              .map(
+                (property) => Parameter(
+                  (p) {
+                    p
+                      ..name = property.name.namePrintable
+                      ..named = true
+                      ..toThis = true
+                      ..required = property.type.isNonNull;
+                  },
+                ),
+              ));
         }
       }))
       ..constructors.add(fromJson)
@@ -167,14 +171,23 @@ Spec classDefinitionToSpec(
           p.annotations.add('override');
         }
 
-        final field = Field(
-          (f) => f
+        final field = Field((f) {
+          f
             ..name = p.name.namePrintable
-            ..type = refer(p.type.namePrintable)
+            // TODO: remove this workaround when code_builder includes late field modifier:
+            // https://github.com/dart-lang/code_builder/pull/310
+            ..type = refer(
+                '${p.type.isNonNull ? 'late ' : ''} ${p.type.namePrintable}')
             ..annotations.addAll(
               p.annotations.map((e) => CodeExpression(Code(e))),
-            ),
-        );
+            );
+
+          if (p.type.isNonNull) {
+            // TODO: apply this fix when code_builder includes late field modifier:
+            // https://github.com/dart-lang/code_builder/pull/310
+            // f.modifier = FieldModifier.late$;
+          }
+        });
         return field;
       })),
   );
@@ -182,10 +195,11 @@ Spec classDefinitionToSpec(
 
 /// Generates a [Spec] of a single fragment class definition.
 Spec fragmentClassDefinitionToSpec(FragmentClassDefinition definition) {
-  final fields = (definition.properties ?? []).map((p) {
+  final fields = definition.properties.map((p) {
     final lines = <String>[];
-    lines.addAll(p.annotations.map((e) => '@${e}'));
-    lines.add('${p.type.namePrintable} ${p.name.namePrintable};');
+    lines.addAll(p.annotations.map((e) => '@$e'));
+    lines.add(
+        '${p.type.isNonNull ? 'late ' : ''}${p.type.namePrintable} ${p.name.namePrintable};');
     return lines.join('\n');
   });
 
@@ -204,7 +218,7 @@ Spec generateArgumentClassSpec(QueryDefinition definition) {
       ..extend = refer('JsonSerializable')
       ..mixins.add(refer('EquatableMixin'))
       ..methods.add(_propsMethod(
-          '[${definition.inputs.map((input) => input.name.namePrintable).join(',')}]'))
+          definition.inputs.map((input) => input.name.namePrintable)))
       ..constructors.add(Constructor(
         (b) => b
           ..optionalParameters.addAll(definition.inputs.map(
@@ -213,11 +227,8 @@ Spec generateArgumentClassSpec(QueryDefinition definition) {
                 p
                   ..name = input.name.namePrintable
                   ..named = true
-                  ..toThis = true;
-
-                if (input.isNonNull) {
-                  p.annotations.add(refer('required'));
-                }
+                  ..toThis = true
+                  ..required = input.type.isNonNull;
               },
             ),
           )),
@@ -245,15 +256,34 @@ Spec generateArgumentClassSpec(QueryDefinition definition) {
       ))
       ..fields.addAll(definition.inputs.map(
         (p) => Field(
-          (f) => f
-            ..name = p.name.namePrintable
-            ..type = refer(p.type.namePrintable)
-            ..modifier = FieldModifier.final$
-            ..annotations
-                .addAll(p.annotations.map((e) => CodeExpression(Code(e)))),
+          (f) {
+            f
+              ..name = p.name.namePrintable
+              // TODO: remove this workaround when code_builder includes late field modifier:
+              // https://github.com/dart-lang/code_builder/pull/310
+              ..type = refer(
+                  '${p.type.isNonNull ? 'late ' : ''} ${p.type.namePrintable}')
+              ..annotations
+                  .addAll(p.annotations.map((e) => CodeExpression(Code(e))));
+
+            if (!p.type.isNonNull) {
+              f.modifier = FieldModifier.final$;
+            }
+          },
         ),
       )),
   );
+}
+
+Spec generateQuerySpec(QueryDefinition definition) {
+  return Block((b) => b
+    ..statements.addAll([
+      Code(
+          "final ${definition.documentOperationName.constantCase} = '${definition.operationName}';"),
+      Code('final ${definition.documentName.constantCase} = '),
+      dart.fromNode(definition.document).code,
+      Code(';'),
+    ]));
 }
 
 /// Generates a [Spec] of a query/mutation class.
@@ -262,6 +292,8 @@ Spec generateQueryClassSpec(QueryDefinition definition) {
       ? '${definition.name.namePrintable}, JsonSerializable'
       : '${definition.name.namePrintable}, ${definition.className}Arguments';
 
+  final name = '${definition.className}${definition.suffix}';
+
   final constructor = definition.inputs.isEmpty
       ? Constructor()
       : Constructor((b) => b
@@ -269,7 +301,8 @@ Spec generateQueryClassSpec(QueryDefinition definition) {
           (p) => p
             ..name = 'variables'
             ..toThis = true
-            ..named = true,
+            ..named = true
+            ..required = true,
         )));
 
   final fields = [
@@ -279,7 +312,7 @@ Spec generateQueryClassSpec(QueryDefinition definition) {
         ..modifier = FieldModifier.final$
         ..type = refer('DocumentNode', 'package:gql/ast.dart')
         ..name = 'document'
-        ..assignment = dart.fromNode(definition.document).code,
+        ..assignment = Code(definition.documentName.constantCase),
     ),
     Field(
       (f) => f
@@ -287,7 +320,7 @@ Spec generateQueryClassSpec(QueryDefinition definition) {
         ..modifier = FieldModifier.final$
         ..type = refer('String')
         ..name = 'operationName'
-        ..assignment = Code('\'${definition.operationName}\''),
+        ..assignment = Code(definition.documentOperationName.constantCase),
     ),
   ];
 
@@ -303,12 +336,14 @@ Spec generateQueryClassSpec(QueryDefinition definition) {
 
   return Class(
     (b) => b
-      ..name = '${definition.className}${definition.suffix}'
+      ..name = name
       ..extend = refer('GraphQLQuery<$typeDeclaration>')
       ..constructors.add(constructor)
       ..fields.addAll(fields)
-      ..methods.add(_propsMethod(
-          '[document, operationName${definition.inputs.isNotEmpty ? ', variables' : ''}]'))
+      ..methods.add(_propsMethod([
+        'document',
+        'operationName${definition.inputs.isNotEmpty ? ', variables' : ''}'
+      ]))
       ..methods.add(Method(
         (m) => m
           ..annotations.add(CodeExpression(Code('override')))
@@ -343,17 +378,6 @@ Spec generateLibrarySpec(LibraryDefinition definition) {
     );
   }
 
-  // inserts import of meta package only if there is at least one non nullable input
-  // see this link for details https://github.com/dart-lang/sdk/issues/4188#issuecomment-240322222
-  if (hasNonNullableInput(definition.queries)) {
-    importDirectives.insertAll(
-      0,
-      [
-        Directive.import('package:meta/meta.dart'),
-      ],
-    );
-  }
-
   importDirectives.addAll(definition.customImports
       .map((customImport) => Directive.import(customImport)));
 
@@ -364,7 +388,7 @@ Spec generateLibrarySpec(LibraryDefinition definition) {
   final uniqueDefinitions = definition.queries
       .map((e) => e.classes.map((e) => e))
       .expand((e) => e)
-      .fold<Map<String, Definition>>(<String, Definition>{}, (acc, element) {
+      .fold<Map<String?, Definition>>(<String?, Definition>{}, (acc, element) {
     acc[element.name.name] = element;
 
     return acc;
@@ -380,16 +404,24 @@ Spec generateLibrarySpec(LibraryDefinition definition) {
   bodyDirectives.addAll(enums.map(enumDefinitionToSpec));
 
   for (final queryDef in definition.queries) {
-    if (queryDef.inputs.isNotEmpty && queryDef.generateHelpers) {
+    if (queryDef.inputs.isNotEmpty &&
+        (queryDef.generateHelpers || queryDef.generateQueries)) {
       bodyDirectives.add(generateArgumentClassSpec(queryDef));
     }
+
+    if (queryDef.generateHelpers || queryDef.generateQueries) {
+      bodyDirectives.add(generateQuerySpec(queryDef));
+    }
+
     if (queryDef.generateHelpers) {
       bodyDirectives.add(generateQueryClassSpec(queryDef));
     }
   }
 
   return Library(
-    (b) => b..directives.addAll(importDirectives)..body.addAll(bodyDirectives),
+    (b) => b
+      ..directives.addAll(importDirectives)
+      ..body.addAll(bodyDirectives),
   );
 }
 
@@ -407,7 +439,7 @@ void writeLibraryDefinitionToBuffer(
   LibraryDefinition definition,
 ) {
   buffer.writeln('// GENERATED CODE - DO NOT MODIFY BY HAND');
-  if (ignoreForFile != null && ignoreForFile.isNotEmpty) {
+  if (ignoreForFile.isNotEmpty) {
     buffer.writeln(
       '// ignore_for_file: ${Set<String>.from(ignoreForFile).join(', ')}',
     );

@@ -1,5 +1,3 @@
-// @dart = 2.8
-
 import 'package:artemis/generator/data/data.dart';
 
 /// Define an exception thrown when duplicated classes names were generated.
@@ -23,21 +21,6 @@ ${a.toString()}
 
 Class B
 ${b.toString()}
-''';
-}
-
-/// Define an exception thrown when `fragments_glob` used with the fragments
-/// inside query files
-class FragmentIgnoreException implements Exception {
-  /// Define an exception thrown when `fragments_glob` used with the fragments
-  /// inside query files
-  const FragmentIgnoreException();
-
-  @override
-  String toString() => '''It seems that you are using `fragments_glob` 
-to specify fragments for all queries mapped in `schema_mapping` and using 
-fragments inside query files.
-If `fragments_glob` assigned, fragments defined in inside query files will be ignored.      
 ''';
 }
 
@@ -67,6 +50,33 @@ Change `schema` or `output` location and try again.
 ''';
 }
 
+/// Define an exception thrown when Artemis does not find asset files
+class MissingFilesException implements Exception {
+  /// glob pattern which was used
+  final String globPattern;
+
+  /// Define an exception thrown when Artemis does not find asset files
+  MissingFilesException(this.globPattern);
+
+  @override
+  String toString() {
+    return 'Missing files for $globPattern';
+  }
+}
+
+/// Define an exception thrown when Artemis does not find required config params
+class MissingBuildConfigurationException implements Exception {
+  /// missing config option name
+  final String name;
+
+  /// Define an exception thrown when Artemis does not find required config params
+  MissingBuildConfigurationException(this.name);
+
+  @override
+  String toString() =>
+      'Missing `$name` configuration option. Cehck `build.yaml` configuration';
+}
+
 /// Define an exception thrown when Artemis find a scalar on schema but it's
 /// not configured on `build.yaml`.
 class MissingScalarConfigurationException implements Exception {
@@ -82,5 +92,38 @@ class MissingScalarConfigurationException implements Exception {
       '''Your `schema` file contains "$scalarName" scalar, but this scalar is not
 configured on `build.yaml`!
 Please configure it, following the README on `scalar_mapping`.
+''';
+}
+
+/// Thrown when Artemis can't find the default (or configured) root object type
+/// on schema.
+class MissingRootTypeException implements Exception {
+  /// Thrown when Artemis can't find the default (or configured) root object
+  /// type on schema.
+  const MissingRootTypeException(this.rootTypeName);
+
+  /// The missing root type name.
+  final String rootTypeName;
+
+  @override
+  String toString() => '''Can't find the "$rootTypeName" root type.
+Make sure your schema file contains it.
+''';
+}
+
+/// Thrown when Artemis can't find the requested fragment on schema.
+class MissingFragmentException implements Exception {
+  /// Thrown when Artemis can't find the requested fragment on schema.
+  const MissingFragmentException(this.fragmentName, this.className);
+
+  /// The missing fragment name.
+  final String fragmentName;
+
+  /// The class name in which the fragment is used.
+  final String className;
+
+  @override
+  String toString() => '''Can't find the "$fragmentName" in "$className".
+Make sure files inside `fragments_glob` or the query file contains it.
 ''';
 }

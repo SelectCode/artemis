@@ -1,24 +1,24 @@
-// @dart = 2.8
-
 import 'package:gql/ast.dart';
 
-List<TypeDefinitionNode> _defaultScalars =
+List<MapEntry<String, TypeDefinitionNode>> _defaultScalars =
     ['Boolean', 'Float', 'ID', 'Int', 'String']
-        .map((e) => ScalarTypeDefinitionNode(
+        .map((e) => MapEntry(
+            e,
+            ScalarTypeDefinitionNode(
               name: NameNode(value: e),
-            ))
+            )))
         .toList();
 
 /// Visits all type definition nodes recursively
 class TypeDefinitionNodeVisitor extends RecursiveVisitor {
   /// Stores all type definition nodes
-  Iterable<TypeDefinitionNode> types = [..._defaultScalars];
+  Map<String, TypeDefinitionNode> types = Map.fromEntries(_defaultScalars);
 
   @override
   void visitObjectTypeDefinitionNode(
     ObjectTypeDefinitionNode node,
   ) {
-    types = types.followedBy([node]);
+    types[node.name.value] = node;
     super.visitObjectTypeDefinitionNode(node);
   }
 
@@ -26,7 +26,7 @@ class TypeDefinitionNodeVisitor extends RecursiveVisitor {
   void visitScalarTypeDefinitionNode(
     ScalarTypeDefinitionNode node,
   ) {
-    types = types.followedBy([node]);
+    types[node.name.value] = node;
     super.visitScalarTypeDefinitionNode(node);
   }
 
@@ -34,7 +34,7 @@ class TypeDefinitionNodeVisitor extends RecursiveVisitor {
   void visitInterfaceTypeDefinitionNode(
     InterfaceTypeDefinitionNode node,
   ) {
-    types = types.followedBy([node]);
+    types[node.name.value] = node;
     super.visitInterfaceTypeDefinitionNode(node);
   }
 
@@ -42,7 +42,7 @@ class TypeDefinitionNodeVisitor extends RecursiveVisitor {
   void visitUnionTypeDefinitionNode(
     UnionTypeDefinitionNode node,
   ) {
-    types = types.followedBy([node]);
+    types[node.name.value] = node;
     super.visitUnionTypeDefinitionNode(node);
   }
 
@@ -50,7 +50,7 @@ class TypeDefinitionNodeVisitor extends RecursiveVisitor {
   void visitInputObjectTypeDefinitionNode(
     InputObjectTypeDefinitionNode node,
   ) {
-    types = types.followedBy([node]);
+    types[node.name.value] = node;
     super.visitInputObjectTypeDefinitionNode(node);
   }
 
@@ -58,16 +58,16 @@ class TypeDefinitionNodeVisitor extends RecursiveVisitor {
   void visitEnumTypeDefinitionNode(
     EnumTypeDefinitionNode node,
   ) {
-    types = types.followedBy([node]);
+    types[node.name.value] = node;
     super.visitEnumTypeDefinitionNode(node);
   }
 
   /// Gets type definition node by type name
-  TypeDefinitionNode getByName(String name) {
-    final type = types.where((type) => type.name.value == name);
+  TypeDefinitionNode? getByName(String name) {
+    final type = types[name];
 
-    if (type.isNotEmpty) {
-      return type.first;
+    if (type != null) {
+      return type;
     }
 
     return null;

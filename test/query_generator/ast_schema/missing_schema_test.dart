@@ -1,5 +1,3 @@
-// @dart = 2.8
-
 import 'package:artemis/generator/data/data.dart';
 import 'package:test/test.dart';
 
@@ -39,13 +37,12 @@ final LibraryDefinition libraryDefinition =
             name: ClassName(name: r'Query$_Query'),
             properties: [
               ClassProperty(
-                  type: TypeName(name: r'String'),
+                  type: DartTypeName(name: r'String'),
                   name: ClassPropertyName(name: r'a'),
-                  isNonNull: false,
                   isResolveType: false)
             ],
             factoryPossibilities: {},
-            typeNameField: TypeName(name: r'__typename'),
+            typeNameField: ClassPropertyName(name: r'__typename'),
             isInput: false)
       ],
       generateHelpers: false,
@@ -60,16 +57,17 @@ import 'package:gql/ast.dart';
 part 'query.graphql.g.dart';
 
 @JsonSerializable(explicitToJson: true)
-class Query$Query with EquatableMixin {
+class Query$Query extends JsonSerializable with EquatableMixin {
   Query$Query();
 
   factory Query$Query.fromJson(Map<String, dynamic> json) =>
       _$Query$QueryFromJson(json);
 
-  String a;
+  String? a;
 
   @override
-  List<Object> get props => [a];
+  List<Object?> get props => [a];
+  @override
   Map<String, dynamic> toJson() => _$Query$QueryToJson(this);
 }
 ''';

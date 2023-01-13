@@ -1,12 +1,10 @@
-// @dart = 2.8
-
-import 'package:artemis/generator/data/data.dart';
 import 'package:artemis/generator/ephemeral_data.dart';
 import 'package:build/build.dart';
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:gql/ast.dart';
 
-typedef _IterableFunction<T, U> = U Function(T i);
-typedef _MergeableFunction<T> = T Function(T oldT, T newT);
+typedef IterableFunction<T, U> = U Function(T i);
+typedef MergeableFunction<T> = T Function(T oldT, T newT);
 
 /// a list of dart lang keywords
 List<String> dartKeywords = const [
@@ -74,7 +72,7 @@ List<String> dartKeywords = const [
 ];
 
 Iterable<T> _removeDuplicatedBy<T, U>(
-    Iterable<T> list, _IterableFunction<T, U> fn) {
+    Iterable<T> list, IterableFunction<T, U> fn) {
   final values = <U, bool>{};
   return list.where((i) {
     final value = fn(i);
@@ -87,16 +85,12 @@ Iterable<T> _removeDuplicatedBy<T, U>(
 /// __typename => $$typename
 /// new -> kw$new
 String normalizeName(String name) {
-  if (name == null) {
-    return name;
-  }
-
   final regExp = RegExp(r'^(_+)([\w$]*)$');
   var matches = regExp.allMatches(name);
 
   if (matches.isNotEmpty) {
     var match = matches.elementAt(0);
-    var fieldName = match.group(2);
+    var fieldName = match.group(2)!;
 
     return fieldName.padLeft(name.length, r'$');
   }
@@ -108,13 +102,16 @@ String normalizeName(String name) {
   return name;
 }
 
-Iterable<T> _mergeDuplicatesBy<T, U>(Iterable<T> list,
-    _IterableFunction<T, U> fn, _MergeableFunction<T> mergeFn) {
+Iterable<T> _mergeDuplicatesBy<T, U>(
+  Iterable<T> list,
+  IterableFunction<T, U> fn,
+  MergeableFunction<T> mergeFn,
+) {
   final values = <U, T>{};
-  list.forEach((i) {
+  for (final i in list) {
     final value = fn(i);
     values.update(value, (oldI) => mergeFn(oldI, i), ifAbsent: () => i);
-  });
+  }
   return values.values.toList();
 }
 
@@ -124,61 +121,40 @@ extension ExtensionsOnIterable<T, U> on Iterable<T> {
   /// Merge multiple values from an iterable given a predicate without modifying
   /// the original iterable.
   Iterable<T> mergeDuplicatesBy(
-          _IterableFunction<T, U> fn, _MergeableFunction<T> mergeFn) =>
+          IterableFunction<T, U> fn, MergeableFunction<T> mergeFn) =>
       _mergeDuplicatesBy(this, fn, mergeFn);
 
   /// Remove duplicated values from an iterable given a predicate without
   /// modifying the original iterable.
-  Iterable<T> removeDuplicatedBy(_IterableFunction<T, U> fn) =>
+  Iterable<T> removeDuplicatedBy(IterableFunction<T, U> fn) =>
       _removeDuplicatedBy(this, fn);
 }
 
-/// Checks if the passed queries contain either:
-/// - A [ClassDefinition] that's an input object with at least one non nullable
-///     property.
-/// - A [QueryInput] which is non nullable.
-bool hasNonNullableInput(Iterable<QueryDefinition> queries) {
-  for (final query in queries) {
-    for (final clazz in query.classes.whereType<ClassDefinition>()) {
-      if (clazz.isInput && clazz.properties.any((p) => p.isNonNull)) {
-        return true;
-      }
-    }
-
-    if (query.inputs.any((i) => i.isNonNull)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /// Check if [obj] has value (isn't null or empty).
-bool hasValue(Object obj) {
+bool hasValue(Object? obj) {
   if (obj is Iterable) {
-    return obj != null && obj.isNotEmpty;
+    return obj.isNotEmpty;
   }
   return obj != null && obj.toString().isNotEmpty;
 }
 
 /// Proceeds deprecated annotation
 List<String> proceedDeprecated(
-  List<DirectiveNode> directives,
+  List<DirectiveNode>? directives,
 ) {
   final annotations = <String>[];
 
-  final deprecatedDirective = directives?.firstWhere(
+  final deprecatedDirective = directives?.firstWhereOrNull(
     (directive) => directive.name.value == 'deprecated',
-    orElse: () => null,
   );
 
   if (deprecatedDirective != null) {
-    final reasonValueNode = deprecatedDirective?.arguments
-        ?.firstWhere((argument) => argument.name.value == 'reason')
+    final reasonValueNode = deprecatedDirective.arguments
+        .firstWhereOrNull((argument) => argument.name.value == 'reason')
         ?.value;
 
     final reason = reasonValueNode is StringValueNode
-        ? reasonValueNode.value
+        ? reasonValueNode.value.replaceAll("'", "\\'").replaceAll(r'$', r'\$')
         : 'No longer supported';
 
     annotations.add("Deprecated('$reason')");

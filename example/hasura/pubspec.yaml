@@ -1,19 +1,17 @@
 name: hasura_example
 version: 0.0.1
 
-authors:
-  - Igor Borges <igor@borges.me>
-
 environment:
-  sdk: ">=2.0.0 <3.0.0"
+  sdk: ">=2.12.0 <3.0.0"
 
 dependencies:
-  http: ^0.12.0+2
-  gql_websocket_link: ^0.1.1-alpha
+  http:
+  gql_websocket_link:
 
 dev_dependencies:
-  test: ^1.6.3
-  build_runner: ^1.5.0
-  json_serializable: ^3.0.0
+  test:
+  lints: ^1.0.1
+  build_runner:
+  json_serializable:
   artemis:
     path: ../../.
