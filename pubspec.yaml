@@ -15,7 +15,7 @@ dependencies:
   dart_style: ^2.2.4
   equatable: ^2.0.5
   glob: ^2.1.0
-  gql_code_builder: ^0.7.2
+  gql_code_builder: ^0.13.1
   gql_dedupe_link: ^2.0.3+1
   gql_exec: ^1.0.0
   gql_http_link: ^1.0.0
